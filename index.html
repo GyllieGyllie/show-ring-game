@@ -1,0 +1,963 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#12241A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Show Ring — build and ride a jumping course</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#12241A}
+a{color:#E8B54A}a:hover{color:#F3CF7A}
+input[type=range]{accent-color:#C8402F;width:100%;margin:0;height:28px}
+button,select,input{font:inherit}
+button{cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid #E8B54A;outline-offset:2px}
+</style>
+
+<style>html,body{height:100%;overscroll-behavior:none}</style>
+</head>
+<body>
+<div id="app"></div>
+<script src="vendor/three.min.js"></script>
+<script src="vendor/htm-preact-standalone.umd.js"></script>
+<script>
+(function () {
+  var html = htmPreact.html;
+  var tplFn = new Function('v', 'html', 'with (v) { return html`' + '<div style="height: 100vh; display: flex; flex-direction: column; background: #12241A; color: #F1EDE2; font-family: \'Figtree\', \'Segoe UI\', system-ui, sans-serif; overflow: hidden">\n\n${(isBuild) ? html`\n<header style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; padding: 10px 16px; border-bottom: 1px solid #2C4A39; background: #152B1F">\n  <div style="display: flex; align-items: center; gap: 10px">\n    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#E8B54A" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="9" r="6"></circle><circle cx="12" cy="9" r="2.6"></circle><path d="M9 14.2 7 22l3-1.6L12 22l2-1.6 3 1.6-2-7.8"></path></svg>\n    <div style="font-family: \'Big Shoulders Display\', \'Arial Narrow\', sans-serif; font-weight: 800; font-size: 28px; letter-spacing: 0.05em; text-transform: uppercase; line-height: 1">Show Ring</div>\n  </div>\n  <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #A9B8AC">Course\n    <input value=${courseName} onInput=${setName} aria-label="Course name" style="background: #0F1F16; color: #F1EDE2; border: 1px solid #2C4A39; border-radius: 8px; padding: 8px 10px; width: 170px; font-size: 15px" />\n  </label>\n  <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; font-size: 13px; color: #A9B8AC">\n    <label style="display: flex; align-items: center; gap: 8px">Width\n      <input type="range" min="20" max="100" step="5" value=${arenaW} onInput=${setW} style="width: 96px" />\n      <span style="color: #F1EDE2; font-weight: 600; min-width: 38px">${arenaW} m</span>\n    </label>\n    <label style="display: flex; align-items: center; gap: 8px">Length\n      <input type="range" min="20" max="80" step="5" value=${arenaL} onInput=${setL} style="width: 96px" />\n      <span style="color: #F1EDE2; font-weight: 600; min-width: 38px">${arenaL} m</span>\n    </label>\n  </div>\n  <select value="" onChange=${loadPreset} aria-label="Load a course" style="background: #0F1F16; color: #F1EDE2; border: 1px solid #2C4A39; border-radius: 8px; padding: 8px 10px; font-size: 14px; min-height: 40px">\n    <option value="">Load a course…</option>\n    <option value="classic">Classic 1.10 m · 8 fences</option>\n    <option value="warmup">Warm-up · 4 fences</option>\n    <option value="empty">Empty arena</option>\n  </select>\n  <div style="flex: 1 1 0; min-width: 0"></div>\n  <div style="display: flex; gap: 8px; flex-wrap: wrap">\n    ${(canUndo) ? html`\n      <button onClick=${undo} style="display: flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 14px; border-radius: 10px; border: 1px solid #2C4A39; background: transparent; color: #F1EDE2; font-weight: 600"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"></path><path d="M4 9h11a5 5 0 0 1 0 10h-3"></path></svg>Undo</button>\n    ` : null}\n    <button onClick=${watch} style="display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px; border-radius: 10px; border: 1px solid #E8B54A; background: transparent; color: #E8B54A; font-weight: 700"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"></path><circle cx="12" cy="12" r="3"></circle></svg>Watch a round</button>\n    <button onClick=${ride} style="display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 20px; border-radius: 10px; border: 0; background: #C8402F; color: #FFFFFF; font-weight: 700"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l12.5-7.5L7 4.5Z"></path></svg>Ride it</button>\n  </div>\n</header>\n\n<main style="flex: 1 1 0; min-height: 0; overflow: auto; display: flex; flex-wrap: wrap; align-items: stretch; gap: 12px; padding: 12px">\n  <section style="flex: 1 1 200px; display: flex; flex-direction: column; gap: 12px; background: #1B3226; border: 1px solid #2C4A39; border-radius: 12px; padding: 14px; box-sizing: border-box">\n    <h2 style="margin: 0; font-family: \'Big Shoulders Display\', \'Arial Narrow\', sans-serif; font-weight: 800; font-size: 20px; letter-spacing: 0.06em; text-transform: uppercase">Add obstacle</h2>\n    <div style="display: flex; flex-wrap: wrap; gap: 8px">\n      <button onClick=${addVertical} style="flex: 1 1 150px; display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 6px 12px; border-radius: 10px; border: 1px solid #2C4A39; background: #213D2E; color: #F1EDE2; text-align: left; font-weight: 600">\n        <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><rect x="15.5" y="6" width="3" height="22" fill="#C8402F"></rect><rect x="13" y="3" width="8" height="4" fill="#F4F1EA"></rect><rect x="13" y="27" width="8" height="4" fill="#F4F1EA"></rect></svg>Vertical</button>\n      <button onClick=${addOxer} style="flex: 1 1 150px; display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 6px 12px; border-radius: 10px; border: 1px solid #2C4A39; background: #213D2E; color: #F1EDE2; text-align: left; font-weight: 600">\n        <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><rect x="10" y="6" width="3" height="22" fill="#2F5FB8"></rect><rect x="21" y="6" width="3" height="22" fill="#2F5FB8"></rect><rect x="8" y="3" width="7" height="4" fill="#F4F1EA"></rect><rect x="19" y="3" width="7" height="4" fill="#F4F1EA"></rect><rect x="8" y="27" width="7" height="4" fill="#F4F1EA"></rect><rect x="19" y="27" width="7" height="4" fill="#F4F1EA"></rect></svg>Oxer</button>\n      <button onClick=${addTriple} style="flex: 1 1 150px; display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 6px 12px; border-radius: 10px; border: 1px solid #2C4A39; background: #213D2E; color: #F1EDE2; text-align: left; font-weight: 600">\n        <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><rect x="6" y="6" width="3" height="22" fill="#2E7D4F"></rect><rect x="15.5" y="6" width="3" height="22" fill="#2E7D4F"></rect><rect x="25" y="6" width="3" height="22" fill="#2E7D4F"></rect><rect x="4" y="3" width="26" height="4" fill="#F4F1EA"></rect><rect x="4" y="27" width="26" height="4" fill="#F4F1EA"></rect></svg>Triple bar</button>\n      <button onClick=${addWall} style="flex: 1 1 150px; display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 6px 12px; border-radius: 10px; border: 1px solid #2C4A39; background: #213D2E; color: #F1EDE2; text-align: left; font-weight: 600">\n        <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><rect x="13.5" y="6" width="7" height="22" fill="#A8432F"></rect><rect x="12" y="2" width="10" height="5" fill="#F4F1EA"></rect><rect x="12" y="27" width="10" height="5" fill="#F4F1EA"></rect></svg>Wall</button>\n      <button onClick=${addLiverpool} style="flex: 1 1 150px; display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 6px 12px; border-radius: 10px; border: 1px solid #2C4A39; background: #213D2E; color: #F1EDE2; text-align: left; font-weight: 600">\n        <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><rect x="7" y="5" width="20" height="24" rx="2" fill="#3F86C9"></rect><rect x="15.5" y="6" width="3" height="22" fill="#C8402F"></rect><rect x="13" y="2" width="8" height="4" fill="#F4F1EA"></rect><rect x="13" y="28" width="8" height="4" fill="#F4F1EA"></rect></svg>Liverpool</button>\n    </div>\n    <p style="margin: 0; font-size: 13px; line-height: 1.5; color: #A9B8AC">Drag a fence to move it. Drag the gold handle to turn it. The arrow is the jumping direction, with the red flag on the right. Fences are jumped in number order.</p>\n  </section>\n\n  <section style="flex: 999 1 460px; min-width: 0; display: flex; flex-direction: column; gap: 8px">\n    <div style="flex: 1 1 auto; background: #1B3226; border: 1px solid #2C4A39; border-radius: 12px; padding: 8px; display: flex; align-items: center; justify-content: center; box-sizing: border-box">\n      <svg ref=${setSvg} viewBox=${viewBox} preserveAspectRatio="xMidYMid meet" onPointerDown=${svgDown} onPointerMove=${svgMove} onPointerUp=${svgUp} onPointerCancel=${svgUp} role="img" aria-label="Arena plan" style="width: 100%; height: auto; max-height: calc(100vh - 150px); display: block; touch-action: none; user-select: none; -webkit-user-select: none">\n        <rect x="0" y="0" width=${arenaW} height=${arenaL} rx="0.6" fill="#D8C49B" stroke="#F4F1EA" stroke-width="0.35"></rect>\n        ${(gridLines||[]).map((gl, $index) => html`\n          <line x1=${gl.x1} y1=${gl.y1} x2=${gl.x2} y2=${gl.y2} stroke="#C3AC80" stroke-width="0.07"></line>\n        `)}\n        ${(rulers||[]).map((ru, $index) => html`\n          <text x=${ru.x} y=${ru.y} font-size="1.1" fill="#7F9484" text-anchor="middle">${ru.t}</text>\n        `)}\n        <polyline points=${pathPoints} fill="none" stroke="#24382B" stroke-opacity="0.6" stroke-width="0.22" stroke-dasharray="0.9 0.7" stroke-linecap="round" stroke-linejoin="round"></polyline>\n        ${(strideLabels||[]).map((sl, $index) => html`\n          <text x=${sl.x} y=${sl.y} font-size="1.05" fill="#5A4524" text-anchor="middle" font-weight="700">${sl.t}</text>\n        `)}\n        ${(items||[]).map((it, $index) => html`\n          <g transform=${it.transform} onPointerDown=${it.onDown} style="cursor: grab">\n            <rect x=${it.hit.x} y=${it.hit.y} width=${it.hit.w} height=${it.hit.h} rx="0.4" fill=${it.hitFill} stroke=${it.hitStroke} stroke-width="0.14" stroke-dasharray="0.5 0.35"></rect>\n            <path d=${it.arrow} fill="none" stroke="#12241A" stroke-opacity="0.7" stroke-width="0.18"></path>\n            <path d=${it.head} fill="#12241A" fill-opacity="0.7"></path>\n            ${(it.parts||[]).map((pt, $index) => html`\n              <rect x=${pt.x} y=${pt.y} width=${pt.w} height=${pt.h} rx=${pt.rx} fill=${pt.fill} stroke="#1B2A20" stroke-width="0.05"></rect>\n            `)}\n          </g>\n        `)}\n        ${(labels||[]).map((lb, $index) => html`\n          <g pointer-events="none">\n            <circle cx=${lb.x} cy=${lb.y} r="1.05" fill=${lb.bg}></circle>\n            <text x=${lb.x} y=${lb.ty} font-size="1.25" text-anchor="middle" fill="#F1EDE2" font-weight="700">${lb.t}</text>\n          </g>\n        `)}\n        ${(handles||[]).map((hd, $index) => html`\n          <g transform=${hd.transform}>\n            <line x1=${hd.x1} y1="0" x2=${hd.hx} y2="0" stroke="#E8B54A" stroke-width="0.16"></line>\n            <circle cx=${hd.hx} cy="0" r="1.1" fill="#E8B54A" stroke="#12241A" stroke-width="0.12" onPointerDown=${hd.onRot} style="cursor: alias"></circle>\n          </g>\n        `)}\n      </svg>\n    </div>\n    <div style="display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: #A9B8AC; padding: 0 4px">\n      <span>Course <strong style="color: #F1EDE2">${courseLen} m</strong></span>\n      <span>Time allowed <strong style="color: #F1EDE2">${ta} s</strong></span>\n      <span>Fences <strong style="color: #F1EDE2">${fenceCount}</strong></span>\n      <span>Grid 5 m · dashed line = riding line</span>\n    </div>\n  </section>\n\n  <aside style="flex: 1 1 280px; display: flex; flex-direction: column; gap: 16px; background: #1B3226; border: 1px solid #2C4A39; border-radius: 12px; padding: 16px; box-sizing: border-box">\n\n    ${(hasFence) ? html`\n      <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 8px">\n        <div>\n          <div style="font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: #A9B8AC">Fence ${selNum} of ${fenceCount}</div>\n          <div style="font-family: \'Big Shoulders Display\', \'Arial Narrow\', sans-serif; font-weight: 800; font-size: 32px; line-height: 1.1">${selType}</div>\n        </div>\n        <div style="display: flex; gap: 6px">\n          <button onClick=${moveEarlier} aria-label="Jump this fence earlier" style="width: 44px; height: 44px; border-radius: 10px; border: 1px solid #2C4A39; background: #213D2E; color: #F1EDE2; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button>\n          <button onClick=${moveLater} aria-label="Jump this fence later" style="width: 44px; height: 44px; border-radius: 10px; border: 1px solid #2C4A39; background: #213D2E; color: #F1EDE2; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg></button>\n        </div>\n      </div>\n      <label style="display: flex; flex-direction: column; gap: 6px; font-size: 14px">\n        <span style="display: flex; justify-content: space-between"><span style="color: #A9B8AC">Height</span><strong>${selH}</strong></span>\n        <input type="range" min="0.6" max="1.6" step="0.05" value=${selHVal} onInput=${setH} />\n      </label>\n      <label style="display: flex; flex-direction: column; gap: 6px; font-size: 14px">\n        <span style="display: flex; justify-content: space-between"><span style="color: #A9B8AC">Rail length</span><strong>${selWidth}</strong></span>\n        <input type="range" min="2.5" max="4.5" step="0.1" value=${selWidthVal} onInput=${setWidth} />\n      </label>\n      ${(hasSpread) ? html`\n        <label style="display: flex; flex-direction: column; gap: 6px; font-size: 14px">\n          <span style="display: flex; justify-content: space-between"><span style="color: #A9B8AC">Spread</span><strong>${selSpread}</strong></span>\n          <input type="range" min="0.6" max="2.2" step="0.1" value=${selSpreadVal} onInput=${setSpread} />\n        </label>\n      ` : null}\n      <div style="display: flex; flex-direction: column; gap: 6px; font-size: 14px">\n        <label style="display: flex; flex-direction: column; gap: 6px">\n          <span style="display: flex; justify-content: space-between"><span style="color: #A9B8AC">Direction</span><strong>${selRot}°</strong></span>\n          <input type="range" min="0" max="355" step="5" value=${selRotVal} onInput=${setRot} />\n        </label>\n        <div style="display: flex; gap: 6px">\n          <button onClick=${rotLeft} aria-label="Turn 15 degrees left" style="flex: 1; min-height: 44px; border-radius: 10px; border: 1px solid #2C4A39; background: #213D2E; color: #F1EDE2; display: flex; align-items: center; justify-content: center; gap: 6px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"></path><path d="M3 3v5h5"></path></svg>15°</button>\n          <button onClick=${rotRight} aria-label="Turn 15 degrees right" style="flex: 1; min-height: 44px; border-radius: 10px; border: 1px solid #2C4A39; background: #213D2E; color: #F1EDE2; display: flex; align-items: center; justify-content: center; gap: 6px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"></path><path d="M21 3v5h-5"></path></svg>15°</button>\n          <button onClick=${flip} aria-label="Jump from the other side" style="flex: 1; min-height: 44px; border-radius: 10px; border: 1px solid #2C4A39; background: #213D2E; color: #F1EDE2; display: flex; align-items: center; justify-content: center; gap: 6px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4 3 8l4 4"></path><path d="M3 8h14"></path><path d="m17 20 4-4-4-4"></path><path d="M21 16H7"></path></svg>Flip</button>\n        </div>\n      </div>\n      <div style="display: flex; flex-direction: column; gap: 8px; font-size: 14px">\n        <span style="color: #A9B8AC">Colour</span>\n        <div style="display: flex; gap: 10px; flex-wrap: wrap">\n          ${(swatches||[]).map((sw, $index) => html`\n            <button onClick=${sw.pick} aria-label=${sw.label} style="width: 44px; height: 44px; border-radius: 50%; border: 2px solid #F4F1EA; background: ${sw.bg}; box-shadow: ${sw.ring}"></button>\n          `)}\n        </div>\n      </div>\n      <div style="font-size: 14px; color: #A9B8AC; border-top: 1px solid #2C4A39; padding-top: 12px">To next fence: <strong style="color: #F1EDE2">${selGap}</strong></div>\n      <div style="display: flex; gap: 8px">\n        <button onClick=${duplicate} style="flex: 1; min-height: 44px; border-radius: 10px; border: 1px solid #2C4A39; background: #213D2E; color: #F1EDE2; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"></rect><path d="M5 15V5a2 2 0 0 1 2-2h8"></path></svg>Duplicate</button>\n        <button onClick=${remove} style="flex: 1; min-height: 44px; border-radius: 10px; border: 1px solid #7A2E24; background: transparent; color: #F2A79C; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M6 6l1 14h10l1-14"></path></svg>Remove</button>\n      </div>\n      <button onClick=${deselect} style="min-height: 44px; border-radius: 10px; border: 0; background: transparent; color: #E8B54A; font-weight: 600; text-decoration: underline">Back to course plan</button>\n    ` : null}\n\n    ${(hasMarker) ? html`\n      <div>\n        <div style="font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: #A9B8AC">Timing line</div>\n        <div style="font-family: \'Big Shoulders Display\', \'Arial Narrow\', sans-serif; font-weight: 800; font-size: 32px; line-height: 1.1">${markerName}</div>\n      </div>\n      <label style="display: flex; flex-direction: column; gap: 6px; font-size: 14px">\n        <span style="display: flex; justify-content: space-between"><span style="color: #A9B8AC">Direction</span><strong>${selRot}°</strong></span>\n        <input type="range" min="0" max="355" step="5" value=${selRotVal} onInput=${setRot} />\n      </label>\n      <div style="display: flex; gap: 6px">\n        <button onClick=${rotLeft} aria-label="Turn 15 degrees left" style="flex: 1; min-height: 44px; border-radius: 10px; border: 1px solid #2C4A39; background: #213D2E; color: #F1EDE2">15° left</button>\n        <button onClick=${rotRight} aria-label="Turn 15 degrees right" style="flex: 1; min-height: 44px; border-radius: 10px; border: 1px solid #2C4A39; background: #213D2E; color: #F1EDE2">15° right</button>\n        <button onClick=${flip} style="flex: 1; min-height: 44px; border-radius: 10px; border: 1px solid #2C4A39; background: #213D2E; color: #F1EDE2">Flip</button>\n      </div>\n      <p style="margin: 0; font-size: 13px; line-height: 1.5; color: #A9B8AC">The clock starts when you cross the start line and stops at the finish line.</p>\n      <button onClick=${deselect} style="min-height: 44px; border-radius: 10px; border: 0; background: transparent; color: #E8B54A; font-weight: 600; text-decoration: underline">Back to course plan</button>\n    ` : null}\n\n    ${(noSel) ? html`\n      <h2 style="margin: 0; font-family: \'Big Shoulders Display\', \'Arial Narrow\', sans-serif; font-weight: 800; font-size: 24px; letter-spacing: 0.04em; text-transform: uppercase">Course plan</h2>\n      <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">\n        <div style="background: #12241A; border-radius: 10px; padding: 10px"><div style="font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: #A9B8AC">Length</div><div style="font-family: \'Big Shoulders Display\', \'Arial Narrow\', sans-serif; font-weight: 800; font-size: 26px">${courseLen} m</div></div>\n        <div style="background: #12241A; border-radius: 10px; padding: 10px"><div style="font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: #A9B8AC">Time allowed</div><div style="font-family: \'Big Shoulders Display\', \'Arial Narrow\', sans-serif; font-weight: 800; font-size: 26px">${ta} s</div></div>\n        <div style="background: #12241A; border-radius: 10px; padding: 10px"><div style="font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: #A9B8AC">Fences</div><div style="font-family: \'Big Shoulders Display\', \'Arial Narrow\', sans-serif; font-weight: 800; font-size: 26px">${fenceCount}</div></div>\n      </div>\n      ${(noFences) ? html`\n        <p style="margin: 0; font-size: 14px; line-height: 1.5; color: #A9B8AC">Add an obstacle to start building, or load the classic course from the menu above.</p>\n      ` : null}\n      <div style="display: flex; flex-direction: column; gap: 6px">\n        ${(planRows||[]).map((row, $index) => html`\n          <button onClick=${row.pick} style="display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 6px 10px; border-radius: 10px; border: 1px solid #2C4A39; background: #213D2E; color: #F1EDE2; text-align: left">\n            <span style="width: 28px; height: 28px; border-radius: 50%; background: #12241A; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; flex: none">${row.n}</span>\n            <span style="flex: 1 1 auto; min-width: 0; font-weight: 600">${row.type} <span style="color: #A9B8AC; font-weight: 500">${row.h}</span></span>\n            <span style="font-size: 12px; color: #A9B8AC; text-align: right">${row.gap}</span>\n          </button>\n        `)}\n      </div>\n      <p style="margin: 0; font-size: 12px; line-height: 1.5; color: #A9B8AC">Time allowed at 350 m/min. Strides counted at about 3.65 m per canter stride, measured on the dashed line.</p>\n      ${(hasRounds) ? html`\n        <div style="border-top: 1px solid #2C4A39; padding-top: 12px; display: flex; flex-direction: column; gap: 6px">\n          <h3 style="margin: 0 0 4px; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: #A9B8AC">Recent rounds</h3>\n          ${(rounds||[]).map((rd, $index) => html`\n            <div style="display: flex; justify-content: space-between; gap: 8px; font-size: 14px"><span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">${rd.name}</span><span style="color: #A9B8AC; white-space: nowrap">${rd.line}</span></div>\n          `)}\n        </div>\n      ` : null}\n    ` : null}\n  </aside>\n</main>\n` : null}\n\n${(isRide) ? html`\n<div ref=${setRideEl} tabIndex="0" onKeyDown=${keyDown} onKeyUp=${keyUp} aria-label="Riding view. Space to jump, arrow keys for speed, Escape to leave." style="position: relative; flex: 1 1 0; min-height: 0; overflow: hidden; outline: none; background: #0B1510; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none">\n  <canvas ref=${setCanvas} onPointerDown=${canvasTap} style="position: absolute; inset: 0; width: 100%; height: 100%; display: block"></canvas>\n\n  <div style="position: absolute; top: 0; left: 0; right: 0; display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; padding: 12px; pointer-events: none">\n    <div style="display: flex; gap: 2px; background: rgba(10,22,15,0.82); border-radius: 12px; overflow: hidden">\n      <div style="padding: 8px 14px"><div style="font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: #A9B8AC">Time</div><div style="font-family: \'Big Shoulders Display\', \'Arial Narrow\', sans-serif; font-weight: 800; font-size: 30px; line-height: 1; font-variant-numeric: tabular-nums; min-width: 72px">${hudTime}</div></div>\n      <div style="padding: 8px 14px; border-left: 1px solid #2C4A39"><div style="font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: #A9B8AC">Faults</div><div style="font-family: \'Big Shoulders Display\', \'Arial Narrow\', sans-serif; font-weight: 800; font-size: 30px; line-height: 1; color: ${hudFaultColor}">${hudFaults}</div></div>\n      <div style="padding: 8px 14px; border-left: 1px solid #2C4A39"><div style="font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: #A9B8AC">Allowed</div><div style="font-family: \'Big Shoulders Display\', \'Arial Narrow\', sans-serif; font-weight: 800; font-size: 30px; line-height: 1">${hudTa}</div></div>\n    </div>\n    <div style="display: flex; flex-direction: column; align-items: center; gap: 6px; background: rgba(10,22,15,0.82); border-radius: 12px; padding: 8px 14px">\n      <div style="font-size: 14px; font-weight: 700; white-space: nowrap">${hudNext} <span style="color: #A9B8AC; font-weight: 500">${hudDist}</span></div>\n      ${(hudShowGuide) ? html`\n        <div aria-hidden="true" style="position: relative; width: 180px; height: 12px; border-radius: 6px; background: #2C4A39">\n          <div style="position: absolute; top: 0; bottom: 0; left: 65%; width: 20%; background: #7B6A35; border-radius: 6px"></div>\n          <div style="position: absolute; top: 0; bottom: 0; left: 70.6%; width: 8.8%; background: #E8B54A; border-radius: 6px"></div>\n          <div style="position: absolute; top: -4px; width: 4px; height: 20px; margin-left: -2px; border-radius: 2px; background: #F1EDE2; left: ${hudGuideLeft}"></div>\n        </div>\n      ` : null}\n    </div>\n    <div style="display: flex; gap: 8px; pointer-events: auto">\n      <button onClick=${toggleGuide} aria-label="Toggle take-off guide" style="height: 44px; padding: 0 12px; border-radius: 10px; border: 0; background: rgba(10,22,15,0.82); color: #F1EDE2; font-size: 13px; font-weight: 600">${guideLabel}</button>\n      <button onClick=${toggleMute} aria-label=${muteLabel} style="width: 44px; height: 44px; border-radius: 10px; border: 0; background: rgba(10,22,15,0.82); color: #F1EDE2; display: flex; align-items: center; justify-content: center">\n        ${(soundOn) ? html`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4V5Z"></path><path d="M15.5 8.5a5 5 0 0 1 0 7"></path><path d="M18.5 5.5a9 9 0 0 1 0 13"></path></svg>` : null}\n        ${(soundOff) ? html`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4V5Z"></path><path d="m22 9-6 6"></path><path d="m16 9 6 6"></path></svg>` : null}\n      </button>\n      <button onClick=${exitRide} aria-label="Back to the course builder" style="width: 44px; height: 44px; border-radius: 10px; border: 0; background: rgba(10,22,15,0.82); color: #F1EDE2; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>\n    </div>\n  </div>\n\n  ${(showControls) ? html`\n    <div style="position: absolute; left: 12px; bottom: 14px; display: flex; align-items: center; gap: 10px">\n      <button onPointerDown=${slowDown} onPointerUp=${speedRelease} onPointerLeave=${speedRelease} onPointerCancel=${speedRelease} aria-label="Slower" style="width: 64px; height: 64px; border-radius: 50%; border: 2px solid rgba(241,237,226,0.5); background: rgba(10,22,15,0.75); color: #F1EDE2; display: flex; align-items: center; justify-content: center; touch-action: none"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button>\n      <div style="background: rgba(10,22,15,0.82); border-radius: 12px; padding: 8px 12px; text-align: center; min-width: 76px">\n        <div style="font-family: \'Big Shoulders Display\', \'Arial Narrow\', sans-serif; font-weight: 800; font-size: 22px; line-height: 1">${hudGait}</div>\n        <div style="font-size: 12px; color: #A9B8AC">${hudSpeed} m/min</div>\n      </div>\n      <button onPointerDown=${speedUp} onPointerUp=${speedRelease} onPointerLeave=${speedRelease} onPointerCancel=${speedRelease} aria-label="Faster" style="width: 64px; height: 64px; border-radius: 50%; border: 2px solid rgba(241,237,226,0.5); background: rgba(10,22,15,0.75); color: #F1EDE2; display: flex; align-items: center; justify-content: center; touch-action: none"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg></button>\n    </div>\n    <button onPointerDown=${jumpBtn} aria-label="Jump" style="position: absolute; right: 16px; bottom: 16px; width: 104px; height: 104px; border-radius: 50%; border: 3px solid #F1EDE2; background: #C8402F; color: #FFFFFF; font-family: \'Big Shoulders Display\', \'Arial Narrow\', sans-serif; font-weight: 800; font-size: 26px; letter-spacing: 0.06em; text-transform: uppercase; box-shadow: 0 6px 24px rgba(0,0,0,0.35); touch-action: none">Jump</button>\n    <div style="position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); font-size: 12px; color: rgba(241,237,226,0.75); white-space: nowrap; pointer-events: none">${controlsHint}</div>\n  ` : null}\n\n  ${(watching) ? html`\n    <div style="position: absolute; left: 12px; bottom: 14px; background: rgba(10,22,15,0.82); border-radius: 12px; padding: 10px 14px; font-size: 14px; font-weight: 600; pointer-events: none">Watching a computer-ridden round · ${hudGait} ${hudSpeed} m/min</div>\n  ` : null}\n\n  ${(hasCountdown) ? html`\n    <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none">\n      <div style="font-family: \'Big Shoulders Display\', \'Arial Narrow\', sans-serif; font-weight: 800; font-size: 140px; color: #F1EDE2; text-shadow: 0 6px 30px rgba(0,0,0,0.45)">${countdown}</div>\n    </div>\n  ` : null}\n\n  ${(hasToast) ? html`\n    <div style="position: absolute; left: 50%; top: 32%; transform: translateX(-50%); pointer-events: none">\n      <div style="padding: 10px 20px; border-radius: 999px; font-weight: 700; font-size: 20px; white-space: nowrap; background: ${toastBg}; color: ${toastFg}; box-shadow: 0 6px 24px rgba(0,0,0,0.3)">${toastText}</div>\n    </div>\n  ` : null}\n\n  ${(hasResult) ? html`\n    <div style="position: absolute; inset: 0; background: rgba(8,16,11,0.72); display: flex; align-items: center; justify-content: center; padding: 16px; box-sizing: border-box; overflow: auto">\n      <div role="dialog" aria-label="Round result" style="width: 100%; max-width: 520px; background: #152B1F; border: 1px solid #2C4A39; border-radius: 16px; padding: 22px; box-sizing: border-box; display: flex; flex-direction: column; gap: 16px">\n        <div>\n          <div style="font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: #A9B8AC">${resKicker}</div>\n          <div style="font-family: \'Big Shoulders Display\', \'Arial Narrow\', sans-serif; font-weight: 800; font-size: 48px; line-height: 1.05; color: ${resColor}">${resTitle}</div>\n        </div>\n        <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px">\n          <div style="background: #12241A; border-radius: 10px; padding: 10px"><div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #A9B8AC">Time</div><div style="font-family: \'Big Shoulders Display\', \'Arial Narrow\', sans-serif; font-weight: 800; font-size: 24px">${resTime}</div></div>\n          <div style="background: #12241A; border-radius: 10px; padding: 10px"><div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #A9B8AC">Allowed</div><div style="font-family: \'Big Shoulders Display\', \'Arial Narrow\', sans-serif; font-weight: 800; font-size: 24px">${resTa} s</div></div>\n          <div style="background: #12241A; border-radius: 10px; padding: 10px"><div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #A9B8AC">Jumping</div><div style="font-family: \'Big Shoulders Display\', \'Arial Narrow\', sans-serif; font-weight: 800; font-size: 24px">${resJf}</div></div>\n          <div style="background: #12241A; border-radius: 10px; padding: 10px"><div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #A9B8AC">Time faults</div><div style="font-family: \'Big Shoulders Display\', \'Arial Narrow\', sans-serif; font-weight: 800; font-size: 24px">${resTf}</div></div>\n        </div>\n        <div style="display: flex; flex-wrap: wrap; gap: 6px">\n          ${(resChips||[]).map((ch, $index) => html`\n            <div style="display: flex; flex-direction: column; align-items: center; min-width: 40px; padding: 6px 4px; border-radius: 8px; background: ${ch.bg}; color: ${ch.fg}"><span style="font-size: 11px; opacity: 0.85">${ch.n}</span><span style="font-weight: 700; font-size: 14px">${ch.st}</span></div>\n          `)}\n        </div>\n        <div style="display: flex; flex-wrap: wrap; gap: 8px">\n          <button onClick=${rideAgain} style="flex: 1 1 140px; min-height: 48px; border-radius: 10px; border: 0; background: #C8402F; color: #FFFFFF; font-weight: 700">Ride again</button>\n          <button onClick=${watchAgain} style="flex: 1 1 140px; min-height: 48px; border-radius: 10px; border: 1px solid #E8B54A; background: transparent; color: #E8B54A; font-weight: 700">Watch a round</button>\n          <button onClick=${exitRide} style="flex: 1 1 140px; min-height: 48px; border-radius: 10px; border: 1px solid #2C4A39; background: #213D2E; color: #F1EDE2; font-weight: 700">Edit course</button>\n        </div>\n      </div>\n    </div>\n  ` : null}\n</div>\n` : null}\n\n</div>' + '`; }');
+  window.DCLogic = class extends htmPreact.Component {
+    render() { return tplFn(this.renderVals(), html); }
+  };
+})();
+</script>
+<script>
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    let course = null, rounds = [];
+    try { course = JSON.parse(window.localStorage.getItem('showring.course.v1') || 'null'); } catch (e) {}
+    try { rounds = JSON.parse(window.localStorage.getItem('showring.rounds.v1') || '[]') || []; } catch (e) {}
+    if (!course || !Array.isArray(course.fences) || !course.start || !course.finish) course = this.preset('classic');
+    this.state = { screen: 'build', course: course, sel: null, auto: false, guide: true, muted: false, hud: null, toast: null, result: null, rounds: rounds, countdown: null, undoN: 0 };
+    this.accel = 0;
+    this.undoStack = [];
+  }
+
+  /* ---------- constants & course data ---------- */
+  K() {
+    if (!this._K) this._K = {
+      types: {
+        vertical: { label: 'Vertical', spread: 0 },
+        oxer: { label: 'Oxer', spread: 1.2 },
+        triple: { label: 'Triple bar', spread: 1.8 },
+        wall: { label: 'Wall', spread: 0 },
+        liverpool: { label: 'Liverpool', spread: 0 }
+      },
+      colors: {
+        red: { label: 'Red and white', main: '#C8402F' },
+        blue: { label: 'Blue and white', main: '#2F5FB8' },
+        green: { label: 'Green and white', main: '#2E7D4F' },
+        yellow: { label: 'Yellow and white', main: '#E3B23C' },
+        black: { label: 'Black and white', main: '#2A2A2A' }
+      }
+    };
+    return this._K;
+  }
+  uid() { return 'f' + Math.random().toString(36).slice(2, 9); }
+  mkFence(type, x, y, rot, h, extra) {
+    return Object.assign({ id: this.uid(), type: type, x: x, y: y, rot: rot, h: h, width: 3.6, spread: this.K().types[type].spread, color: 'red' }, extra || {});
+  }
+  preset(name) {
+    const f = (t, x, y, r, h, e) => this.mkFence(t, x, y, r, h, e);
+    if (name === 'warmup') return { name: 'Warm-up', w: 60, l: 40, start: { x: 12, y: 30, rot: 0 }, finish: { x: 6, y: 17, rot: 90 }, fences: [
+      f('vertical', 24, 30, 0, 0.8, { color: 'blue' }), f('oxer', 42, 30, 0, 0.85, { color: 'green' }),
+      f('vertical', 42, 10, 180, 0.9, { color: 'yellow' }), f('oxer', 22, 10, 180, 0.9, { color: 'blue' })] };
+    if (name === 'empty') return { name: 'New course', w: 60, l: 40, start: { x: 10, y: 20, rot: 0 }, finish: { x: 50, y: 20, rot: 0 }, fences: [] };
+    return { name: 'Classic 1.10 m', w: 60, l: 40, start: { x: 12, y: 34, rot: 0 }, finish: { x: 48, y: 24, rot: 0 }, fences: [
+      f('vertical', 24, 34, 0, 1.0), f('oxer', 44, 34, 0, 1.05, { color: 'blue' }),
+      f('vertical', 54, 18, 270, 1.1, { color: 'green' }), f('triple', 40, 6, 180, 1.05, { color: 'yellow' }),
+      f('vertical', 26, 6, 180, 1.1), f('oxer', 18.5, 6, 180, 1.1, { color: 'blue' }),
+      f('liverpool', 8, 22, 90, 1.1, { color: 'blue' }), f('wall', 30, 24, 0, 1.1)] };
+  }
+  fenceGeom(f) {
+    const h = f.h, S = f.spread || 0;
+    let els, half;
+    if (f.type === 'oxer') { els = [{ x: -S / 2, h: h - 0.05 }, { x: S / 2, h: h }]; half = S / 2 + 0.15; }
+    else if (f.type === 'triple') { els = [{ x: -S / 2, h: h * 0.6 }, { x: 0, h: h * 0.8 }, { x: S / 2, h: h }]; half = S / 2 + 0.15; }
+    else if (f.type === 'wall') { els = [{ x: 0, h: h }]; half = 0.3; }
+    else if (f.type === 'liverpool') { els = [{ x: 0, h: h }]; half = 1.1; }
+    else { els = [{ x: 0, h: h }]; half = 0.15; }
+    let minX = 1e9, maxX = -1e9, hMax = 0;
+    els.forEach(e => { minX = Math.min(minX, e.x); maxX = Math.max(maxX, e.x); hMax = Math.max(hMax, e.h); });
+    return { els: els, half: half, minX: minX, maxX: maxX, hMax: hMax };
+  }
+
+  /* ---------- riding line ---------- */
+  buildPath(c) {
+    const R = Math.PI / 180, dir = r => ({ x: Math.cos(r * R), y: Math.sin(r * R) });
+    const fs = c.fences.map(f => ({ f: f, g: this.fenceGeom(f), d: dir(f.rot), a: 4.5, b: 4 }));
+    for (let i = 0; i < fs.length - 1; i++) {
+      const A = fs[i], B = fs[i + 1];
+      const D = Math.hypot(B.f.x - A.f.x, B.f.y - A.f.y);
+      const free = D - A.g.half - B.g.half;
+      if (free < 10.5) { const leg = Math.max(0.5, free * 0.45); A.b = Math.min(A.b, leg); B.a = Math.min(B.a, leg); }
+    }
+    const d0 = dir(c.start.rot), df = dir(c.finish.rot);
+    const nodes = [
+      { p: { x: c.start.x - d0.x * 12, y: c.start.y - d0.y * 12 }, d: d0, straight: true },
+      { p: { x: c.start.x, y: c.start.y }, d: d0 }
+    ];
+    fs.forEach((F, i) => {
+      const A = F.g.half + F.a, B = F.g.half + F.b;
+      nodes.push({ p: { x: F.f.x - F.d.x * A, y: F.f.y - F.d.y * A }, d: F.d, straight: true, fi: i, lead: A });
+      nodes.push({ p: { x: F.f.x + F.d.x * B, y: F.f.y + F.d.y * B }, d: F.d });
+    });
+    nodes.push({ p: { x: c.finish.x, y: c.finish.y }, d: df, straight: true });
+    nodes.push({ p: { x: c.finish.x + df.x * 10, y: c.finish.y + df.y * 10 }, d: df });
+    const raw = [{ x: nodes[0].p.x, y: nodes[0].p.y }], markIdx = [0];
+    for (let n = 0; n < nodes.length - 1; n++) {
+      const A = nodes[n], B = nodes[n + 1];
+      const dx = B.p.x - A.p.x, dy = B.p.y - A.p.y, dist = Math.hypot(dx, dy);
+      if (A.straight) {
+        const steps = Math.max(2, Math.ceil(dist / 0.3));
+        for (let k = 1; k <= steps; k++) { const t = k / steps; raw.push({ x: A.p.x + dx * t, y: A.p.y + dy * t }); }
+      } else {
+        const dot = A.d.x * B.d.x + A.d.y * B.d.y;
+        const kk = Math.max(2, dist * (0.5 + 0.375 * (1 - dot)));
+        const steps = Math.max(8, Math.ceil(dist / 0.15));
+        for (let k = 1; k <= steps; k++) {
+          const t = k / steps, t2 = t * t, t3 = t2 * t;
+          const h00 = 2 * t3 - 3 * t2 + 1, h10 = t3 - 2 * t2 + t, h01 = -2 * t3 + 3 * t2, h11 = t3 - t2;
+          raw.push({ x: h00 * A.p.x + h10 * A.d.x * kk + h01 * B.p.x + h11 * B.d.x * kk, y: h00 * A.p.y + h10 * A.d.y * kk + h01 * B.p.y + h11 * B.d.y * kk });
+        }
+      }
+      markIdx.push(raw.length - 1);
+    }
+    const cum = new Float64Array(raw.length);
+    for (let i = 1; i < raw.length; i++) cum[i] = cum[i - 1] + Math.hypot(raw[i].x - raw[i - 1].x, raw[i].y - raw[i - 1].y);
+    const total = cum[raw.length - 1], ds = 0.25, N = Math.floor(total / ds) + 2;
+    const px = new Float32Array(N), py = new Float32Array(N);
+    let j = 0;
+    for (let i = 0; i < N; i++) {
+      const s = Math.min(total, i * ds);
+      while (j < raw.length - 2 && cum[j + 1] < s) j++;
+      const seg = (cum[j + 1] - cum[j]) || 1, t = Math.max(0, Math.min(1, (s - cum[j]) / seg));
+      px[i] = raw[j].x + (raw[j + 1].x - raw[j].x) * t;
+      py[i] = raw[j].y + (raw[j + 1].y - raw[j].y) * t;
+    }
+    const sNode = markIdx.map(i => cum[i]);
+    const fences = [];
+    nodes.forEach((nd, n) => { if (nd.fi !== undefined) fences.push({ fi: nd.fi, sC: sNode[n] + nd.lead, g: fs[nd.fi].g, f: fs[nd.fi].f }); });
+    const sStart = sNode[1], sFinish = sNode[nodes.length - 2];
+    const length = Math.max(0, sFinish - sStart);
+    const gaps = fences.map((F, i) => {
+      const nx = fences[i + 1];
+      if (!nx) return null;
+      const d = nx.sC - F.sC;
+      const strides = Math.round((d - 3.7) / 3.65);
+      return { d: d, strides: d <= 32 && strides >= 1 ? strides : null, s: (F.sC + nx.sC) / 2 };
+    });
+    return { px: px, py: py, ds: ds, N: N, total: total, sStart: sStart, sFinish: sFinish, length: length, ta: Math.ceil(length / (350 / 60)), fences: fences, gaps: gaps };
+  }
+  posAt(P, s) {
+    const u = Math.max(0, Math.min(P.N - 1.001, s / P.ds)), i = Math.floor(u), t = u - i;
+    return { x: P.px[i] + (P.px[i + 1] - P.px[i]) * t, y: P.py[i] + (P.py[i + 1] - P.py[i]) * t };
+  }
+  gapText(gp) {
+    if (!gp) return 'last fence';
+    return gp.d.toFixed(1) + ' m' + (gp.strides ? ' · ' + gp.strides + (gp.strides === 1 ? ' stride' : ' strides') : '');
+  }
+
+  /* ---------- builder actions ---------- */
+  save(c) {
+    clearTimeout(this._saveT);
+    this._saveT = setTimeout(() => { try { window.localStorage.setItem('showring.course.v1', JSON.stringify(c)); } catch (e) {} }, 250);
+  }
+  pushUndo() {
+    this.undoStack.push(JSON.stringify(this.state.course));
+    if (this.undoStack.length > 40) this.undoStack.shift();
+  }
+  updateCourse(fn, noUndo) {
+    if (!noUndo) this.pushUndo();
+    const c = JSON.parse(JSON.stringify(this.state.course));
+    fn(c);
+    this.setState({ course: c, undoN: this.undoStack.length });
+    this.save(c);
+  }
+  undo() {
+    const prev = this.undoStack.pop();
+    if (!prev) return;
+    const c = JSON.parse(prev);
+    const sel = this.state.sel;
+    const keep = sel === 'start' || sel === 'finish' || c.fences.some(f => f.id === sel);
+    this.setState({ course: c, sel: keep ? sel : null, undoN: this.undoStack.length });
+    this.save(c);
+  }
+  itemRef(c, id) {
+    if (id === 'start') return c.start;
+    if (id === 'finish') return c.finish;
+    return c.fences.find(f => f.id === id) || null;
+  }
+  addFence(type) {
+    const c0 = this.state.course;
+    if (c0.fences.length >= 24) return;
+    const nf = this.mkFence(type, Math.round(c0.w / 2), Math.round(c0.l / 2), 0, 1.0, { color: ['red', 'blue', 'green', 'yellow', 'black'][c0.fences.length % 5] });
+    if (type === 'wall') nf.color = 'red';
+    this.updateCourse(c => { c.fences.push(nf); });
+    this.setState({ sel: nf.id });
+  }
+  patchSel(patch, noUndo) {
+    const id = this.state.sel;
+    this.updateCourse(c => { const it = this.itemRef(c, id); if (it) Object.assign(it, patch); }, noUndo);
+  }
+  rotBy(d) {
+    const it = this.itemRef(this.state.course, this.state.sel);
+    if (it) this.patchSel({ rot: ((Math.round(it.rot + d) % 360) + 360) % 360 });
+  }
+  setArena(key, v) {
+    this.updateCourse(c => {
+      c[key] = v;
+      const lim = key === 'w' ? 'x' : 'y';
+      c.fences.concat([c.start, c.finish]).forEach(it => { it[lim] = Math.max(0, Math.min(v, it[lim])); });
+    });
+  }
+  svgPoint(e) {
+    const svg = this.svgEl;
+    if (!svg || !svg.getScreenCTM) return null;
+    const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
+    const m = svg.getScreenCTM();
+    return m ? pt.matrixTransform(m.inverse()) : null;
+  }
+  beginDrag(e, id, mode) {
+    e.stopPropagation();
+    if (e.preventDefault) e.preventDefault();
+    const p = this.svgPoint(e), it = this.itemRef(this.state.course, id);
+    if (!p || !it) return;
+    this.pushUndo();
+    this.drag = { id: id, mode: mode, ox: p.x - it.x, oy: p.y - it.y };
+    try { this.svgEl.setPointerCapture(e.pointerId); } catch (err) {}
+    this.setState({ sel: id, undoN: this.undoStack.length });
+  }
+  dragMove(e) {
+    const d = this.drag;
+    if (!d) return;
+    const p = this.svgPoint(e);
+    if (!p) return;
+    const c = this.state.course, it = this.itemRef(c, d.id);
+    if (!it) return;
+    if (d.mode === 'move') {
+      const x = Math.max(0, Math.min(c.w, Math.round((p.x - d.ox) * 2) / 2));
+      const y = Math.max(0, Math.min(c.l, Math.round((p.y - d.oy) * 2) / 2));
+      if (x !== it.x || y !== it.y) this.updateCourse(cc => { const t = this.itemRef(cc, d.id); t.x = x; t.y = y; }, true);
+    } else {
+      let a = Math.atan2(p.y - it.y, p.x - it.x) * 180 / Math.PI;
+      a = ((Math.round(a / 5) * 5) % 360 + 360) % 360;
+      if (a !== it.rot) this.updateCourse(cc => { this.itemRef(cc, d.id).rot = a; }, true);
+    }
+  }
+  dragEnd(e) {
+    if (this.drag) { try { this.svgEl.releasePointerCapture(e.pointerId); } catch (err) {} }
+    this.drag = null;
+  }
+
+  /* ---------- ride lifecycle ---------- */
+  goRide(auto) {
+    this.ensureAudio();
+    this.accel = 0;
+    this.setState({ screen: 'ride', auto: !!auto, result: null, toast: null, hud: null, countdown: null });
+  }
+  exitRide() { this.accel = 0; this.setState({ screen: 'build', result: null, toast: null, countdown: null }); }
+  onCanvas(el) {
+    if (el) { this.canvasEl = el; this.initThree(); }
+    else { this.disposeThree(); this.canvasEl = null; }
+  }
+  componentWillUnmount() { this.disposeThree(); clearTimeout(this._toastT); }
+  initThree() {
+    const T = window.THREE;
+    if (!T) { clearTimeout(this._wt); this._wt = setTimeout(() => { if (this.canvasEl && !this.g) this.initThree(); }, 120); return; }
+    if (this.g || !this.canvasEl) return;
+    let renderer;
+    try { renderer = new T.WebGLRenderer({ canvas: this.canvasEl, antialias: true, powerPreference: 'high-performance' }); }
+    catch (e) { this.toast('3D is not available on this device', 'bad', 4000); return; }
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = T.PCFSoftShadowMap;
+    const camera = new T.PerspectiveCamera(70, 1, 0.1, 700);
+    camera.rotation.order = 'YXZ';
+    this.g = { T: T, renderer: renderer, camera: camera, scene: null, size: [0, 0], falling: [], fenceObjs: [] };
+    this.buildNeck();
+    this.newRun();
+    this.last = performance.now();
+    const loop = (now) => { if (!this.g) return; this.raf = requestAnimationFrame(loop); try { this.frame(now); } catch (err) { console.error(err); } };
+    this.raf = requestAnimationFrame(loop);
+  }
+  disposeThree() {
+    cancelAnimationFrame(this.raf);
+    clearTimeout(this._wt);
+    const g = this.g;
+    if (!g) return;
+    this.g = null;
+    if (g.scene) { g.scene.remove(g.camera); this.disposeObj(g.scene); }
+    this.disposeObj(g.camera);
+    try { g.renderer.dispose(); } catch (e) {}
+  }
+  disposeObj(root) {
+    root.traverse(o => {
+      if (o.geometry) o.geometry.dispose();
+      if (o.material) [].concat(o.material).forEach(m => { if (m.map) m.map.dispose(); m.dispose(); });
+    });
+  }
+
+  /* ---------- audio ---------- */
+  ensureAudio() {
+    try {
+      if (!this.ac) { const AC = window.AudioContext || window.webkitAudioContext; if (AC) this.ac = new AC(); }
+      if (this.ac && this.ac.state === 'suspended') this.ac.resume();
+      if (this.ac && !this.noiseBuf) {
+        const b = this.ac.createBuffer(1, Math.floor(this.ac.sampleRate * 0.5), this.ac.sampleRate), d = b.getChannelData(0);
+        for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+        this.noiseBuf = b;
+      }
+    } catch (e) {}
+  }
+  sfx(kind) {
+    if (this.state.muted || !this.ac || !this.noiseBuf) return;
+    const ac = this.ac, t = ac.currentTime;
+    try {
+      if (kind === 'hoof' || kind === 'land' || kind === 'thud') {
+        const src = ac.createBufferSource(); src.buffer = this.noiseBuf;
+        const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = kind === 'hoof' ? 420 : 240;
+        const gn = ac.createGain(), vol = kind === 'land' ? 0.9 : kind === 'thud' ? 0.6 : 0.3, dur = kind === 'hoof' ? 0.09 : 0.25;
+        gn.gain.setValueAtTime(vol, t); gn.gain.exponentialRampToValueAtTime(0.001, t + dur);
+        src.connect(f); f.connect(gn); gn.connect(ac.destination); src.start(t); src.stop(t + dur + 0.05);
+      } else if (kind === 'knock') {
+        [0, 0.12, 0.2].forEach((dl, i) => {
+          const o = ac.createOscillator(); o.type = 'triangle';
+          o.frequency.setValueAtTime(420 - i * 70, t + dl); o.frequency.exponentialRampToValueAtTime(150, t + dl + 0.16);
+          const gn = ac.createGain(); gn.gain.setValueAtTime(0.0001, t + dl); gn.gain.exponentialRampToValueAtTime(0.5 / (i + 1), t + dl + 0.008); gn.gain.exponentialRampToValueAtTime(0.001, t + dl + 0.2);
+          o.connect(gn); gn.connect(ac.destination); o.start(t + dl); o.stop(t + dl + 0.24);
+        });
+      } else if (kind === 'beep' || kind === 'go' || kind === 'bell') {
+        const o = ac.createOscillator(); o.type = 'sine'; o.frequency.value = kind === 'beep' ? 660 : kind === 'go' ? 990 : 1320;
+        const gn = ac.createGain(), dur = kind === 'bell' ? 0.9 : 0.18;
+        gn.gain.setValueAtTime(0.25, t); gn.gain.exponentialRampToValueAtTime(0.001, t + dur);
+        o.connect(gn); gn.connect(ac.destination); o.start(t); o.stop(t + dur + 0.05);
+      }
+    } catch (e) {}
+  }
+
+  /* ---------- 3D scene ---------- */
+  rng(seed) { let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
+  gauss() { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+  canvasTex(w, h, draw, rx, ry) {
+    const T = this.g.T, cv = document.createElement('canvas');
+    cv.width = w; cv.height = h;
+    draw(cv.getContext('2d'), w, h);
+    const t = new T.CanvasTexture(cv);
+    t.colorSpace = T.SRGBColorSpace;
+    if (rx) { t.wrapS = t.wrapT = T.RepeatWrapping; t.repeat.set(rx, ry); }
+    t.anisotropy = 4;
+    return t;
+  }
+  buildNeck() {
+    const T = this.g.T, cam = this.g.camera;
+    const neck = new T.Group();
+    const coat = new T.MeshStandardMaterial({ color: 0x6e3c1e, roughness: 0.6 });
+    const dark = new T.MeshStandardMaterial({ color: 0x1c120c, roughness: 0.85 });
+    const nk = new T.Mesh(new T.CylinderGeometry(0.11, 0.21, 1.15, 18), coat);
+    nk.rotation.x = -1.107; nk.position.set(0, -0.62, -0.85); neck.add(nk);
+    const mane = new T.Mesh(new T.BoxGeometry(0.055, 1.12, 0.08), dark);
+    mane.position.set(0, 0, 0.15); nk.add(mane);
+    const head = new T.Mesh(new T.CylinderGeometry(0.13, 0.085, 0.6, 16), coat);
+    head.rotation.x = 0.4636; head.position.set(0, -0.6, -1.475); neck.add(head);
+    const fore = new T.Mesh(new T.BoxGeometry(0.07, 0.05, 0.12), dark);
+    fore.position.set(0, -0.31, -1.39); neck.add(fore);
+    [-1, 1].forEach(s => {
+      const ear = new T.Mesh(new T.ConeGeometry(0.036, 0.17, 10), coat);
+      ear.position.set(s * 0.075, -0.25, -1.36); ear.rotation.set(-0.25, 0, -s * 0.2); neck.add(ear);
+      const rein = new T.Mesh(new T.CylinderGeometry(0.008, 0.008, 1.25, 5), dark);
+      rein.position.set(s * 0.13, -0.68, -0.98); rein.rotation.set(-1.32, 0, s * 0.03); neck.add(rein);
+    });
+    cam.add(neck);
+    this.g.neck = neck;
+  }
+  buildScene() {
+    const g = this.g, T = g.T, c = this.rideCourse, W = c.w, L = c.l;
+    if (g.scene) { g.scene.remove(g.camera); this.disposeObj(g.scene); }
+    const scene = new T.Scene();
+    scene.background = new T.Color(0xbcd6e6);
+    scene.fog = new T.Fog(0xbcd6e6, 80, 300);
+    scene.add(g.camera);
+    g.scene = scene; g.falling = []; g.fenceObjs = []; g.railMats = {};
+    scene.add(new T.HemisphereLight(0xe4f0ff, 0x6b5a3a, 1.25));
+    const sun = new T.DirectionalLight(0xfff1d8, 2.6);
+    const ext = Math.max(W, L) / 2 + 8;
+    sun.position.set(-30, 55, 20); sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    Object.assign(sun.shadow.camera, { left: -ext, right: ext, top: ext, bottom: -ext, near: 1, far: 160 });
+    sun.shadow.bias = -0.0006;
+    scene.add(sun); scene.add(sun.target);
+    // ground
+    const rnd = this.rng(7);
+    const sandTex = this.canvasTex(512, 512, (x, w, h) => {
+      x.fillStyle = '#d6c094'; x.fillRect(0, 0, w, h);
+      for (let i = 0; i < 9000; i++) { const v = rnd(); x.fillStyle = v < 0.5 ? 'rgba(120,92,52,0.16)' : 'rgba(255,248,230,0.2)'; x.fillRect(rnd() * w, rnd() * h, 1 + rnd() * 2, 1 + rnd() * 2); }
+      x.strokeStyle = 'rgba(140,110,66,0.12)'; x.lineWidth = 2;
+      for (let yy = 0; yy < h; yy += 9) { x.beginPath(); x.moveTo(0, yy + rnd() * 2); x.lineTo(w, yy + rnd() * 2); x.stroke(); }
+    }, W / 8, L / 8);
+    const sand = new T.Mesh(new T.PlaneGeometry(W, L), new T.MeshStandardMaterial({ map: sandTex, roughness: 1 }));
+    sand.rotation.x = -Math.PI / 2; sand.receiveShadow = true; scene.add(sand);
+    const grassTex = this.canvasTex(256, 256, (x, w, h) => {
+      x.fillStyle = '#5d8a45'; x.fillRect(0, 0, w, h);
+      for (let i = 0; i < 6000; i++) { x.fillStyle = rnd() < 0.5 ? 'rgba(40,70,30,0.25)' : 'rgba(160,200,110,0.18)'; x.fillRect(rnd() * w, rnd() * h, 1, 2 + rnd() * 3); }
+    }, 80, 80);
+    const grass = new T.Mesh(new T.PlaneGeometry(800, 800), new T.MeshStandardMaterial({ map: grassTex, roughness: 1 }));
+    grass.rotation.x = -Math.PI / 2; grass.position.y = -0.25; scene.add(grass);
+    // arena boundary
+    const white = new T.MeshStandardMaterial({ color: 0xf4f1ea, roughness: 0.6 });
+    const posts = [];
+    const pushSide = (x0, z0, x1, z1) => {
+      const len = Math.hypot(x1 - x0, z1 - z0), n = Math.max(2, Math.round(len / 2.5));
+      for (let i = 0; i < n; i++) posts.push([x0 + (x1 - x0) * i / n, z0 + (z1 - z0) * i / n]);
+      [0.55, 1.0].forEach(yy => {
+        const rail = new T.Mesh(new T.BoxGeometry(len, 0.1, 0.05), white);
+        rail.position.set((x0 + x1) / 2, yy, (z0 + z1) / 2); rail.rotation.y = -Math.atan2(z1 - z0, x1 - x0); rail.castShadow = true; scene.add(rail);
+      });
+    };
+    const hw = W / 2 + 0.6, hl = L / 2 + 0.6;
+    pushSide(-hw, -hl, hw, -hl); pushSide(hw, -hl, hw, hl); pushSide(hw, hl, -hw, hl); pushSide(-hw, hl, -hw, -hl);
+    const postMesh = new T.InstancedMesh(new T.BoxGeometry(0.12, 1.2, 0.12), white, posts.length);
+    const m4 = new T.Matrix4();
+    posts.forEach((p, i) => { m4.makeTranslation(p[0], 0.6, p[1]); postMesh.setMatrixAt(i, m4); });
+    postMesh.castShadow = true; scene.add(postMesh);
+    // trees and a stand
+    const trees = [];
+    for (let i = 0; i < 140; i++) {
+      const a = rnd() * Math.PI * 2, rr = 1 + rnd() * 0.9;
+      const x = Math.cos(a) * (W / 2 + 14) * rr * 1.25, z = Math.sin(a) * (L / 2 + 14) * rr * 1.25;
+      if (Math.abs(x) < W / 2 + 10 && Math.abs(z) < L / 2 + 10) continue;
+      trees.push([x, z, 0.8 + rnd() * 0.7]);
+    }
+    const crown = new T.InstancedMesh(new T.ConeGeometry(2.4, 7.5, 8), new T.MeshStandardMaterial({ color: 0x2f5a32, roughness: 0.9 }), trees.length);
+    const trunk = new T.InstancedMesh(new T.CylinderGeometry(0.25, 0.32, 2, 6), new T.MeshStandardMaterial({ color: 0x5a3f28 }), trees.length);
+    const q = new T.Quaternion(), sc = new T.Vector3(), pos = new T.Vector3();
+    trees.forEach((t, i) => {
+      sc.set(t[2], t[2], t[2]);
+      pos.set(t[0], 1 * t[2], t[1]); m4.compose(pos, q, sc); trunk.setMatrixAt(i, m4);
+      pos.set(t[0], (2 + 3.75) * t[2], t[1]); m4.compose(pos, q, sc); crown.setMatrixAt(i, m4);
+    });
+    scene.add(crown); scene.add(trunk);
+    const stand = new T.Mesh(new T.BoxGeometry(Math.min(40, W * 0.7), 5, 7), new T.MeshStandardMaterial({ color: 0x31463a, roughness: 0.8 }));
+    stand.position.set(0, 2.5, -L / 2 - 9); scene.add(stand);
+    const roof = new T.Mesh(new T.BoxGeometry(Math.min(42, W * 0.72), 0.4, 8.5), new T.MeshStandardMaterial({ color: 0xc8402f, roughness: 0.7 }));
+    roof.position.set(0, 7.2, -L / 2 - 9); scene.add(roof);
+    // obstacles
+    c.fences.forEach((f, i) => g.fenceObjs.push(this.buildFence(scene, f, i, W, L, white)));
+    this.buildLine(scene, c.start, W, L, white, 'start');
+    this.buildLine(scene, c.finish, W, L, white, 'finish');
+  }
+  railMat(color) {
+    const g = this.g, T = g.T;
+    g.railMats = g.railMats || {};
+    if (g.railMats[color]) return g.railMats[color];
+    const main = (this.K().colors[color] || this.K().colors.red).main;
+    const tex = this.canvasTex(8, 256, (x, w, h) => { for (let i = 0; i < 8; i++) { x.fillStyle = i % 2 ? '#f6f3ec' : main; x.fillRect(0, i * h / 8, w, h / 8); } });
+    g.railMats[color] = new T.MeshStandardMaterial({ map: tex, roughness: 0.45 });
+    return g.railMats[color];
+  }
+  buildFence(scene, f, idx, W, L, white) {
+    const T = this.g.T, geo = this.fenceGeom(f), Wd = f.width;
+    const grp = new T.Group();
+    grp.position.set(f.x - W / 2, 0, f.y - L / 2);
+    grp.rotation.y = -f.rot * Math.PI / 180;
+    scene.add(grp);
+    const main = new T.Color((this.K().colors[f.color] || this.K().colors.red).main);
+    const wingMat = new T.MeshStandardMaterial({ color: main, roughness: 0.55 });
+    const rail = (x, y, mat) => {
+      const m = new T.Mesh(new T.CylinderGeometry(0.055, 0.055, Wd, 14), mat || this.railMat(f.color));
+      m.rotation.x = Math.PI / 2; m.position.set(x, y, 0); m.castShadow = true;
+      const holder = new T.Group(); holder.position.set(x, y, 0); m.position.set(0, 0, 0); holder.add(m); grp.add(holder);
+      return holder;
+    };
+    const standards = (x, top, flags) => {
+      [-1, 1].forEach(s => {
+        const ph = Math.max(1.6, top + 0.35);
+        const post = new T.Mesh(new T.BoxGeometry(0.12, ph, 0.12), white);
+        post.position.set(x, ph / 2, s * (Wd / 2 + 0.08)); post.castShadow = true; grp.add(post);
+        const wh = Math.max(1.1, top + 0.15);
+        const wing = new T.Mesh(new T.BoxGeometry(0.06, wh, 0.9), wingMat);
+        wing.position.set(x, wh / 2, s * (Wd / 2 + 0.6)); wing.castShadow = true; grp.add(wing);
+        if (flags) {
+          const flag = new T.Mesh(new T.BoxGeometry(0.02, 0.24, 0.32), new T.MeshStandardMaterial({ color: s > 0 ? 0xc8402f : 0xf6f3ec, side: T.DoubleSide }));
+          flag.position.set(x, ph + 0.05, s * (Wd / 2 + 0.08) + s * 0.18); grp.add(flag);
+        }
+      });
+    };
+    const els = geo.els.map(e => ({ x: e.x, h: e.h, meshes: [], knocked: false }));
+    const fillers = (x, top) => {
+      const n = Math.max(1, Math.round(top / 0.4) - 1);
+      for (let k = 1; k <= n; k++) rail(x, top * k / (n + 1));
+    };
+    if (f.type === 'wall') {
+      const bodyH = Math.max(0.3, f.h - 0.18);
+      const brick = this.canvasTex(128, 128, (x, w, h) => {
+        x.fillStyle = main.getStyle(); x.fillRect(0, 0, w, h);
+        x.strokeStyle = 'rgba(245,240,230,0.75)'; x.lineWidth = 3;
+        for (let r = 0; r < 4; r++) { x.beginPath(); x.moveTo(0, r * 32); x.lineTo(w, r * 32); x.stroke(); for (let k = 0; k < 3; k++) { const bx = (k * 48 + (r % 2) * 24) % w; x.beginPath(); x.moveTo(bx, r * 32); x.lineTo(bx, r * 32 + 32); x.stroke(); } }
+      }, Wd / 1.4, bodyH / 0.7);
+      const body = new T.Mesh(new T.BoxGeometry(0.55, bodyH, Wd), new T.MeshStandardMaterial({ map: brick, roughness: 0.8 }));
+      body.position.set(0, bodyH / 2, 0); body.castShadow = true; body.receiveShadow = true; grp.add(body);
+      const n = Math.max(4, Math.round(Wd / 0.6)), bw = Wd / n;
+      const capMat = new T.MeshStandardMaterial({ color: 0xece4d2, roughness: 0.7 });
+      for (let k = 0; k < n; k++) {
+        const b = new T.Mesh(new T.BoxGeometry(0.55, 0.18, bw - 0.02), capMat);
+        b.castShadow = true;
+        const holder = new T.Group(); holder.position.set(0, bodyH + 0.09, -Wd / 2 + (k + 0.5) * bw); holder.add(b); grp.add(holder);
+        holder.userData = { block: true, bw: bw };
+        els[0].meshes.push(holder);
+      }
+      [-1, 1].forEach(s => {
+        const pil = new T.Mesh(new T.BoxGeometry(0.7, f.h + 0.35, 0.7), white);
+        pil.position.set(0, (f.h + 0.35) / 2, s * (Wd / 2 + 0.36)); pil.castShadow = true; grp.add(pil);
+        const flag = new T.Mesh(new T.BoxGeometry(0.02, 0.24, 0.32), new T.MeshStandardMaterial({ color: s > 0 ? 0xc8402f : 0xf6f3ec }));
+        flag.position.set(0, f.h + 0.55, s * (Wd / 2 + 0.36)); grp.add(flag);
+      });
+    } else {
+      const xs = [];
+      geo.els.forEach(e => { if (xs.indexOf(e.x) < 0) xs.push(e.x); });
+      xs.forEach((x, k) => {
+        const top = Math.max.apply(null, geo.els.filter(e => e.x === x).map(e => e.h));
+        standards(x, top, k === 0);
+      });
+      els.forEach((e, k) => {
+        e.meshes.push(rail(e.x, e.h));
+        if (f.type === 'triple') { if (k === 0) rail(e.x, e.h * 0.45); }
+        else if (f.type === 'oxer') { rail(e.x, e.h * 0.5); }
+        else fillers(e.x, e.h);
+      });
+      if (f.type === 'vertical') rail(-0.45, 0.07);
+      if (f.type === 'liverpool') {
+        const rim = new T.Mesh(new T.BoxGeometry(2.4, 0.06, Wd + 0.5), new T.MeshStandardMaterial({ color: 0x23302a }));
+        rim.position.set(0, 0.03, 0); rim.receiveShadow = true; grp.add(rim);
+        const water = new T.Mesh(new T.BoxGeometry(2.2, 0.07, Wd + 0.3), new T.MeshStandardMaterial({ color: 0x3a82c4, roughness: 0.12, metalness: 0.2 }));
+        water.position.set(0, 0.04, 0); water.receiveShadow = true; grp.add(water);
+      }
+    }
+    // number board on the left wing
+    const num = this.canvasTex(64, 64, (x, w, h) => { x.fillStyle = '#f6f3ec'; x.fillRect(0, 0, w, h); x.fillStyle = '#12241A'; x.font = 'bold 44px sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(String(idx + 1), w / 2, h / 2 + 2); });
+    const board = new T.Mesh(new T.BoxGeometry(0.04, 0.42, 0.42), new T.MeshStandardMaterial({ map: num }));
+    board.position.set(geo.minX - 0.05, Math.max(1.1, geo.hMax + 0.15) + 0.32, -(Wd / 2 + 0.6));
+    grp.add(board);
+    return { grp: grp, els: els };
+  }
+  buildLine(scene, it, W, L, white, kind) {
+    const T = this.g.T, grp = new T.Group();
+    grp.position.set(it.x - W / 2, 0, it.y - L / 2); grp.rotation.y = -it.rot * Math.PI / 180; scene.add(grp);
+    [-1, 1].forEach(s => {
+      const post = new T.Mesh(new T.CylinderGeometry(0.05, 0.05, 1.8, 8), white);
+      post.position.set(0, 0.9, s * 2.4); post.castShadow = true; grp.add(post);
+      const flag = new T.Mesh(new T.BoxGeometry(0.02, 0.36, 0.5), new T.MeshStandardMaterial({ color: s > 0 ? 0xc8402f : 0xf6f3ec }));
+      flag.position.set(0, 1.62, s * 2.4 + s * 0.26); grp.add(flag);
+    });
+    const line = new T.Mesh(new T.PlaneGeometry(0.12, 4.8), new T.MeshBasicMaterial({ color: kind === 'start' ? 0xf6f3ec : 0xe8b54a }));
+    line.rotation.x = -Math.PI / 2; line.position.y = 0.01; grp.add(line);
+  }
+
+  /* ---------- run ---------- */
+  newRun() {
+    if (!this.g) return;
+    this.rideCourse = JSON.parse(JSON.stringify(this.state.course));
+    this.P = this.buildPath(this.rideCourse);
+    this.buildScene();
+    const n = this.P.fences.length;
+    this.run = { s: 0, v: 0, target: 6, phase: 'countdown', cd: 3, lastCd: 4, time: 0, timing: false, faults: 0, knocked: {}, refs: {}, refusals: 0, jump: null, tried: false, fi: 0,
+      noise: Array.from({ length: n }, () => this.gauss() * 0.3), strideP: 0, shake: 0, finishT: 0, look: null, slowT: 0, lookBack: null, elim: false };
+    this._hudT = 1;
+    this.setState({ result: null, toast: null, countdown: '3' });
+  }
+  jumpParams(nf, v) {
+    const g = nf.g, S = g.maxX - g.minX;
+    const L = (3.0 + S + g.hMax * 0.9) * Math.max(0.85, Math.min(1.15, v / 6));
+    const H = g.hMax + 0.32 - Math.max(0, 4.5 - v) * 0.15;
+    const mid = nf.sC + (g.minX + g.maxX) / 2;
+    return { L: L, H: H, sIdeal: mid - L / 2 };
+  }
+  jumpY(j, s) { const t = (s - j.s0) / j.L; return t <= 0 || t >= 1 ? 0 : j.H * 4 * t * (1 - t); }
+  doJump() {
+    const r = this.run;
+    if (!r || r.phase !== 'riding' || r.jump) return;
+    const nf = this.P.fences[r.fi];
+    if (!nf) return;
+    if (r.s > nf.sC + nf.g.maxX) return;
+    const jp = this.jumpParams(nf, r.v), e = r.s - jp.sIdeal;
+    if (e < -2.8) { this.toast('Too early', 'info'); return; }
+    r.jump = { s0: r.s, L: jp.L, H: jp.H };
+    r.tried = true;
+    const ae = Math.abs(e);
+    if (ae < 0.35) this.toast('Perfect take-off', 'good');
+    else if (ae < 0.8) this.toast('Good', 'info');
+    else this.toast(e < 0 ? 'Long spot' : 'Deep spot', 'info');
+    this.sfx('hoof');
+  }
+  knock(fi, k) {
+    const r = this.run, obj = this.g.fenceObjs[fi];
+    if (!obj) return;
+    const el = obj.els[k];
+    if (!el || el.knocked) return;
+    el.knocked = true;
+    if (!r.knocked[fi]) { r.knocked[fi] = true; r.faults += 4; }
+    let list = el.meshes;
+    if (list.length > 2) { const mid = Math.floor(list.length / 2) + (Math.random() < 0.5 ? -1 : 0); list = list.slice(Math.max(0, mid - 1), mid + 1 + (Math.random() < 0.5 ? 1 : 0)); }
+    list.forEach(m => {
+      const block = !!(m.userData && m.userData.block);
+      this.g.falling.push({ m: m, block: block, len: block ? m.userData.bw : this.rideCourse.fences[fi].width,
+        vx: r.v * (block ? 0.25 : 0.35) + Math.random() * 0.6, vy: 0.6 + Math.random() * 0.8, vz: (Math.random() - 0.5) * 0.6,
+        wx: (Math.random() - 0.5) * (block ? 4 : 2.4), wz: block ? (Math.random() - 0.5) * 6 : -4, rest: false, hit: false });
+    });
+    r.slowT = 1.1;
+    r.lookBack = { t: 0, fi: fi };
+    r.shake = Math.max(r.shake, 0.2);
+    this.sfx('knock');
+    this.toast(this.rideCourse.fences[fi].type === 'wall' ? 'Block down · 4 faults' : 'Rail down · 4 faults', 'bad');
+  }
+  refuse(fi) {
+    const r = this.run, nf = this.P.fences[fi];
+    r.phase = 'refused'; r.refT = 1.8; r.v = 0;
+    r.s = Math.min(r.s, nf.sC + nf.g.minX - 1.2);
+    r.refusals++; r.faults += 4; r.refs[fi] = (r.refs[fi] || 0) + 1; r.shake = 0.5;
+    this.sfx('thud');
+    if (r.refusals >= 2) { r.elim = true; this.toast('Second refusal · eliminated', 'bad', 1800); }
+    else this.toast('Refusal · 4 faults', 'bad', 1500);
+  }
+  step(dt) {
+    const r = this.run, P = this.P;
+    if (!r) return;
+    if (r.phase === 'countdown') {
+      r.cd -= dt;
+      const n = Math.ceil(r.cd);
+      if (n !== r.lastCd && n > 0) { r.lastCd = n; this.sfx('beep'); this.setState({ countdown: String(n) }); }
+      if (r.cd <= 0) { r.phase = 'riding'; this.sfx('go'); this.setState({ countdown: null }); this.toast('Go', 'good', 700); }
+      return;
+    }
+    if (r.phase === 'refused') {
+      r.refT -= dt; r.v = 0;
+      if (r.refT <= 0) {
+        if (r.elim) { r.phase = 'done'; this.finishRound(); return; }
+        const nf = P.fences[r.fi], prev = P.fences[r.fi - 1];
+        let back = nf.sC - 18;
+        if (prev) back = Math.max(back, prev.sC + prev.g.maxX + 1.5);
+        r.s = Math.max(0, Math.min(back, nf.sC + nf.g.minX - 6)); r.v = 3.5; r.phase = 'riding'; r.look = null; r.tried = false;
+      }
+      return;
+    }
+    if (r.phase === 'done') return;
+    if (r.phase === 'riding') {
+      if (this.state.auto) r.target = 6.2;
+      else r.target = Math.max(2.5, Math.min(9, r.target + this.accel * 3 * dt));
+    } else if (r.phase === 'finishing') r.target = 1.5;
+    if (!r.jump) { const a = r.phase === 'finishing' ? 3 : 2.2; r.v += Math.max(-a * dt, Math.min(a * dt, r.target - r.v)); }
+    const s0 = r.s;
+    r.s = Math.min(P.total - 0.05, r.s + r.v * dt);
+    const s1 = r.s;
+    if (!r.jump) {
+      const p0 = r.strideP;
+      r.strideP += r.v / 3.6 * dt;
+      const beats = r.v < 3.8 ? [0, 0.5] : [0, 0.13, 0.26];
+      const f0 = p0 % 1, f1 = r.strideP % 1, wrapped = Math.floor(r.strideP) !== Math.floor(p0);
+      beats.forEach(b => { if ((f0 < b && f1 >= b) || (wrapped && (b > f0 || b <= f1))) this.sfx('hoof'); });
+    }
+    if (!r.timing && r.phase === 'riding' && s0 < P.sStart && s1 >= P.sStart) r.timing = true;
+    if (r.timing) r.time += dt;
+    if (r.jump && s1 >= r.jump.s0 + r.jump.L) { r.jump = null; this.sfx('land'); r.strideP = Math.floor(r.strideP); }
+    const nf = P.fences[r.fi];
+    if (nf && r.phase === 'riding') {
+      const jp = this.jumpParams(nf, r.v);
+      if (this.state.auto && !r.jump && s1 >= jp.sIdeal + r.noise[r.fi]) this.doJump();
+      nf.g.els.forEach((e, k) => {
+        const es = nf.sC + e.x;
+        if (s0 < es && s1 >= es) { const y = r.jump ? this.jumpY(r.jump, es) : 0; if (y < e.h - 0.03) this.knock(r.fi, k); }
+      });
+      const sFirst = nf.sC + nf.g.minX, sLast = nf.sC + nf.g.maxX;
+      if (!r.jump && !r.tried && s1 >= sFirst - 0.6 && s1 < sFirst) { this.refuse(r.fi); return; }
+      if (s1 > sLast + 0.3 && !r.jump) { r.fi++; r.tried = false; }
+    }
+    if (r.phase === 'riding' && s0 < P.sFinish && s1 >= P.sFinish) {
+      r.timing = false; r.phase = 'finishing'; r.finishT = 1.3; this.sfx('bell');
+    }
+    if (r.phase === 'finishing') { r.finishT -= dt; if (r.finishT <= 0) { r.phase = 'done'; this.finishRound(); } }
+  }
+  finishRound() {
+    const r = this.run, P = this.P;
+    const over = r.time - P.ta, tf = r.elim ? 0 : (over > 0 ? Math.ceil(over - 1e-9) : 0);
+    const chips = P.fences.map((F, i) => {
+      const k = r.knocked[i], rf = r.refs[i];
+      const st = k && rf ? 'R+4' : k ? '4' : rf ? 'R' : (i < r.fi ? 'clear' : '–');
+      return { n: i + 1, st: st, bg: k ? '#C8402F' : rf ? '#E8B54A' : '#213D2E', fg: k ? '#FFFFFF' : rf ? '#1B1A12' : '#F1EDE2' };
+    });
+    const total = r.faults + tf;
+    const result = { elim: r.elim, total: total, jf: r.faults, tf: tf, time: r.time.toFixed(2), ta: P.ta, chips: chips, auto: this.state.auto };
+    const when = new Date();
+    const line = (r.elim ? 'Eliminated' : total + ' faults · ' + r.time.toFixed(2) + ' s') + (this.state.auto ? ' · watched' : '');
+    const rounds = [{ name: this.rideCourse.name || 'Course', line: line, at: when.getTime() }].concat(this.state.rounds || []).slice(0, 8);
+    try { window.localStorage.setItem('showring.rounds.v1', JSON.stringify(rounds)); } catch (e) {}
+    this.setState({ result: result, rounds: rounds });
+  }
+  updateFalling(dt) {
+    const g = this.g;
+    g.falling.forEach(p => {
+      if (p.rest) return;
+      const m = p.m;
+      p.vy -= 9.8 * dt;
+      m.position.x += p.vx * dt; m.position.y += p.vy * dt; m.position.z += p.vz * dt;
+      m.rotation.x += p.wx * dt; m.rotation.z += p.wz * dt;
+      const ext = p.block ? 0.09 + Math.abs(Math.sin(m.rotation.x)) * p.len / 2 + Math.abs(Math.sin(m.rotation.z)) * 0.27 : 0.055 + Math.abs(Math.sin(m.rotation.x)) * p.len / 2;
+      if (m.position.y - ext < 0) {
+        m.position.y = ext;
+        if (p.vy < 0) p.vy = -p.vy * 0.28;
+        p.vx *= 0.6; p.vz *= 0.6; p.wx *= 0.4; m.rotation.x *= 0.65;
+        if (p.block) { p.wz *= 0.4; m.rotation.z = Math.round(m.rotation.z / (Math.PI / 2)) * (Math.PI / 2) * 0.3 + m.rotation.z * 0.7; }
+        else p.wz = -p.vx / 0.055;
+        if (!p.hit) { p.hit = true; this.sfx('thud'); }
+        if (Math.abs(p.vy) < 0.45 && Math.abs(p.vx) < 0.12) {
+          p.rest = true; m.rotation.x = 0;
+          if (p.block) { m.rotation.z = Math.round(m.rotation.z / (Math.PI / 2)) * (Math.PI / 2); m.position.y = Math.abs(Math.sin(m.rotation.z)) > 0.5 ? 0.275 : 0.09; }
+          else m.position.y = 0.055;
+        }
+      }
+    });
+  }
+  updateCam(dtReal) {
+    const g = this.g, r = this.run, P = this.P, c = this.rideCourse, T = g.T;
+    const W = c.w, L = c.l;
+    const p = this.posAt(P, r.s), q = this.posAt(P, Math.min(P.total, r.s + 6));
+    const jy = r.jump ? this.jumpY(r.jump, r.s) : 0, jyA = r.jump ? this.jumpY(r.jump, r.s + 2.5) : 0;
+    const ph = r.strideP * Math.PI * 2, amp = Math.min(1, r.v / 6);
+    const bob = r.jump ? 0 : (0.055 * Math.sin(ph) + 0.02 * Math.sin(ph * 2)) * amp;
+    r.shake = Math.max(0, r.shake - dtReal);
+    const sh = r.shake * 0.12;
+    const ey = 2.35 + bob + jy * 0.92;
+    const cx = p.x - W / 2, cz = p.y - L / 2;
+    g.camera.position.set(cx + (Math.random() - 0.5) * sh, ey + (Math.random() - 0.5) * sh, cz);
+    if (Math.hypot(q.x - p.x, q.y - p.y) > 1) {
+      const tgt = new T.Vector3(q.x - W / 2, ey - 0.85 + (jyA - jy) * 1.4, q.y - L / 2);
+      if (!r.look) r.look = tgt.clone(); else r.look.lerp(tgt, 1 - Math.exp(-dtReal * 7));
+    }
+    if (!r.look) return;
+    const dx = r.look.x - cx, dy = r.look.y - ey, dz = r.look.z - cz;
+    let yaw = Math.atan2(-dx, -dz), pitch = Math.atan2(dy, Math.hypot(dx, dz));
+    let back = 0;
+    if (r.lookBack) {
+      const lb = r.lookBack; lb.t += dtReal;
+      const t = lb.t;
+      back = t < 0.3 ? t / 0.3 : t < 1.4 ? 1 : t < 1.9 ? 1 - (t - 1.4) / 0.5 : 0;
+      back = back * back * (3 - 2 * back);
+      if (t >= 1.9) r.lookBack = null;
+      const f = c.fences[lb.fi];
+      if (f) {
+        const bx = f.x - W / 2 - cx, bz = f.y - L / 2 - cz, by = 0.5 - ey;
+        const yawB = Math.atan2(-bx, -bz), pitchB = Math.atan2(by, Math.max(0.5, Math.hypot(bx, bz)));
+        let dyaw = yawB - yaw; while (dyaw > Math.PI) dyaw -= 2 * Math.PI; while (dyaw < -Math.PI) dyaw += 2 * Math.PI;
+        yaw += dyaw * back; pitch += (pitchB - pitch) * back;
+      }
+    }
+    g.camera.rotation.set(pitch, yaw, 0);
+    let nod = r.jump ? 0 : 0.035 * Math.sin(ph + 0.6) * amp;
+    if (r.jump) { const t = Math.min(1, (r.s - r.jump.s0) / r.jump.L); nod = -0.22 * Math.sin(Math.PI * t) + 0.12 * Math.sin(2 * Math.PI * t); }
+    if (r.phase === 'refused') nod = 0.16;
+    g.neck.rotation.x += (nod - g.neck.rotation.x) * Math.min(1, dtReal * 12);
+    g.neck.visible = back < 0.25;
+  }
+  frame(now) {
+    const g = this.g;
+    let dt = (now - this.last) / 1000; this.last = now;
+    dt = Math.max(0, Math.min(dt, 0.05));
+    const cv = this.canvasEl;
+    if (!cv) return;
+    const w = cv.clientWidth | 0, h = cv.clientHeight | 0;
+    if (w && h && (w !== g.size[0] || h !== g.size[1])) {
+      g.size = [w, h]; g.renderer.setSize(w, h, false);
+      g.camera.aspect = w / h; g.camera.fov = w / h < 1 ? 86 : 70; g.camera.updateProjectionMatrix();
+    }
+    const r = this.run;
+    let scale = 1;
+    if (r && r.slowT > 0) { r.slowT -= dt; scale = r.slowT > 0.25 ? 0.35 : 0.35 + (0.25 - Math.max(0, r.slowT)) / 0.25 * 0.65; }
+    this.step(dt * scale);
+    this.updateFalling(dt * scale);
+    this.updateCam(dt);
+    g.renderer.render(g.scene, g.camera);
+    this.hudTick(dt);
+  }
+  hudTick(dt) {
+    this._hudT = (this._hudT || 0) + dt;
+    if (this._hudT < 0.08) return;
+    this._hudT = 0;
+    const r = this.run, P = this.P;
+    if (!r) return;
+    const nf = P.fences[r.fi];
+    let next = 'Finish', dist = Math.max(0, P.sFinish - r.s), guideLeft = null;
+    if (nf) {
+      next = 'Fence ' + (r.fi + 1);
+      dist = Math.max(0, nf.sC + nf.g.minX - r.s);
+      const e = r.s - this.jumpParams(nf, r.v).sIdeal;
+      if (!r.jump && r.phase === 'riding' && e > -9 && e < 1.8) guideLeft = Math.max(0, Math.min(100, (e + 6) / 8 * 100)).toFixed(1) + '%';
+    }
+    if (r.phase === 'finishing' || r.phase === 'done') { next = 'Finished'; dist = 0; }
+    const gait = r.v < 0.5 ? 'Halt' : r.v < 3.8 ? 'Trot' : r.v < 7.2 ? 'Canter' : 'Gallop';
+    this.setState({ hud: { time: r.time.toFixed(2), faults: r.faults, ta: P.ta, next: next, dist: next === 'Finished' ? '' : Math.round(dist) + ' m', guideLeft: guideLeft, gait: gait, speed: Math.round(r.v * 60) } });
+  }
+  toast(text, tone, ms) {
+    clearTimeout(this._toastT);
+    this.setState({ toast: { text: text, tone: tone || 'info' } });
+    this._toastT = setTimeout(() => this.setState({ toast: null }), ms || 1100);
+  }
+
+  /* ---------- render ---------- */
+  bindRefs() {
+    this.refs_ = {
+      setSvg: el => { this.svgEl = el; },
+      setCanvas: el => this.onCanvas(el),
+      setRideEl: el => { this.rideEl = el; if (el) setTimeout(() => { try { el.focus({ preventScroll: true }); } catch (e) {} }, 60); }
+    };
+  }
+  renderVals() {
+    if (!this.refs_) this.bindRefs();
+    const st = this.state, c = st.course, K = this.K();
+    const isRide = st.screen === 'ride';
+    const v = {
+      isBuild: !isRide, isRide: isRide,
+      setSvg: this.refs_.setSvg, setCanvas: this.refs_.setCanvas, setRideEl: this.refs_.setRideEl,
+      courseName: c.name || '', arenaW: c.w, arenaL: c.l, canUndo: st.undoN > 0,
+      setName: e => { const val = e.target.value.slice(0, 40); this.updateCourse(cc => { cc.name = val; }, true); },
+      setW: e => this.setArena('w', +e.target.value), setL: e => this.setArena('l', +e.target.value),
+      loadPreset: e => { const val = e.target.value; if (!val) return; this.pushUndo(); const pc = this.preset(val); this.setState({ course: pc, sel: null, undoN: this.undoStack.length }); this.save(pc); },
+      undo: () => this.undo(),
+      ride: () => this.goRide(false), watch: () => this.goRide(true),
+      addVertical: () => this.addFence('vertical'), addOxer: () => this.addFence('oxer'), addTriple: () => this.addFence('triple'),
+      addWall: () => this.addFence('wall'), addLiverpool: () => this.addFence('liverpool'),
+      svgDown: () => { if (!this.drag && this.state.sel) this.setState({ sel: null }); },
+      svgMove: e => this.dragMove(e), svgUp: e => this.dragEnd(e),
+      deselect: () => this.setState({ sel: null }),
+      // ride
+      keyDown: e => this.onKey(e, true), keyUp: e => this.onKey(e, false),
+      canvasTap: e => { if (e.pointerType !== 'mouse' || e.button === 0) this.doJump(); },
+      jumpBtn: e => { e.preventDefault(); this.ensureAudio(); this.doJump(); },
+      speedUp: e => { e.preventDefault(); this.accel = 1; }, slowDown: e => { e.preventDefault(); this.accel = -1; }, speedRelease: () => { this.accel = 0; },
+      exitRide: () => this.exitRide(),
+      rideAgain: () => { this.setState({ auto: false }); this.newRun(); },
+      watchAgain: () => { this.setState({ auto: true }); this.newRun(); },
+      toggleMute: () => this.setState({ muted: !st.muted }), soundOn: !st.muted, soundOff: st.muted, muteLabel: st.muted ? 'Turn sound on' : 'Turn sound off',
+      toggleGuide: () => this.setState({ guide: !st.guide }), guideLabel: st.guide ? 'Guide on' : 'Guide off'
+    };
+    if (isRide) {
+      const h = st.hud || { time: '0.00', faults: 0, ta: '–', next: '', dist: '', guideLeft: null, gait: 'Halt', speed: 0 };
+      Object.assign(v, {
+        hudTime: h.time, hudFaults: h.faults, hudFaultColor: h.faults ? '#F2A79C' : '#F1EDE2', hudTa: h.ta, hudNext: h.next, hudDist: h.dist,
+        hudShowGuide: !!(st.guide && h.guideLeft && !st.auto), hudGuideLeft: h.guideLeft || '0%', hudGait: h.gait, hudSpeed: h.speed,
+        showControls: !st.auto && !st.result, watching: st.auto && !st.result,
+        controlsHint: 'Tap the view or press Space to jump · hold + / − for pace',
+        hasCountdown: !!st.countdown, countdown: st.countdown || '',
+        hasToast: !!st.toast, toastText: st.toast ? st.toast.text : '',
+        toastBg: st.toast && st.toast.tone === 'good' ? '#E8B54A' : st.toast && st.toast.tone === 'bad' ? '#C8402F' : 'rgba(10,22,15,0.85)',
+        toastFg: st.toast && st.toast.tone === 'good' ? '#1B1A12' : '#FFFFFF',
+        hasResult: !!st.result
+      });
+      const rs = st.result;
+      if (rs) Object.assign(v, {
+        resKicker: (rs.auto ? 'Watched round · ' : 'Your round · ') + (c.name || 'Course'),
+        resTitle: rs.elim ? 'Eliminated' : rs.total === 0 ? 'Clear round' : rs.total + (rs.total === 1 ? ' fault' : ' faults'),
+        resColor: rs.elim ? '#F2A79C' : rs.total === 0 ? '#E8B54A' : '#F1EDE2',
+        resTime: rs.time, resTa: rs.ta, resJf: rs.jf, resTf: rs.tf, resChips: rs.chips
+      });
+      return v;
+    }
+    // ---------- builder ----------
+    const P = this.buildPath(c);
+    const W = c.w, L = c.l, sel = st.sel;
+    v.viewBox = '-4 -4 ' + (W + 8) + ' ' + (L + 8);
+    const grid = [];
+    for (let x = 5; x < W; x += 5) grid.push({ x1: x, y1: 0, x2: x, y2: L });
+    for (let y = 5; y < L; y += 5) grid.push({ x1: 0, y1: y, x2: W, y2: y });
+    v.gridLines = grid;
+    const rul = [];
+    for (let x = 10; x < W; x += 10) rul.push({ x: x, y: -1.2, t: x + ' m' });
+    v.rulers = rul;
+    const pts = [];
+    for (let i = 0; i < P.N; i += 4) pts.push(P.px[i].toFixed(2) + ',' + P.py[i].toFixed(2));
+    v.pathPoints = pts.join(' ');
+    v.strideLabels = P.gaps.filter(gp => gp && gp.strides).map(gp => { const p = this.posAt(P, gp.s); return { x: p.x.toFixed(2), y: (p.y - 0.6).toFixed(2), t: gp.strides + ' str' }; });
+    const R = Math.PI / 180, items = [], labels = [], handles = [];
+    const mkItem = (id, it, parts, hit, half, label, bg) => {
+      const selected = sel === id;
+      const tail = -(half + 1.6), tip = half + 1.9;
+      items.push({ transform: 'translate(' + it.x + ' ' + it.y + ') rotate(' + it.rot + ')', parts: parts, hit: hit,
+        hitFill: selected ? 'rgba(232,181,74,0.22)' : 'rgba(0,0,0,0)', hitStroke: selected ? '#E8B54A' : 'none',
+        arrow: 'M ' + tail + ' 0 L ' + (tip - 0.6) + ' 0', head: 'M ' + tip + ' 0 L ' + (tip - 0.85) + ' -0.55 L ' + (tip - 0.85) + ' 0.55 Z',
+        onDown: e => this.beginDrag(e, id, 'move') });
+      const lx = Math.sin(it.rot * R), ly = -Math.cos(it.rot * R), off = -hit.y + 0.6;
+      labels.push({ x: (it.x + lx * off).toFixed(2), y: (it.y + ly * off).toFixed(2), ty: (it.y + ly * off + 0.45).toFixed(2), t: label, bg: bg });
+      if (selected) handles.push({ transform: 'translate(' + it.x + ' ' + it.y + ') rotate(' + it.rot + ')', x1: tip, hx: tip + 2.2, onRot: e => this.beginDrag(e, id, 'rotate') });
+    };
+    c.fences.forEach((f, i) => {
+      const g = this.fenceGeom(f), Wd = f.width, col = (K.colors[f.color] || K.colors.red).main, parts = [];
+      if (f.type === 'liverpool') parts.push({ x: -1.1, y: -Wd / 2 - 0.2, w: 2.2, h: Wd + 0.4, fill: '#3F86C9', rx: 0.25 });
+      if (f.type === 'wall') {
+        parts.push({ x: -0.3, y: -Wd / 2, w: 0.6, h: Wd, fill: col, rx: 0.05 });
+        parts.push({ x: -0.4, y: -Wd / 2 - 0.8, w: 0.8, h: 0.8, fill: '#F4F1EA', rx: 0.05 }, { x: -0.4, y: Wd / 2, w: 0.8, h: 0.8, fill: '#F4F1EA', rx: 0.05 });
+      } else {
+        const xs = [];
+        g.els.forEach(e => { if (xs.indexOf(e.x) < 0) xs.push(e.x); parts.push({ x: e.x - 0.09, y: -Wd / 2, w: 0.18, h: Wd, fill: col, rx: 0.05 }); });
+        xs.forEach(x => { parts.push({ x: x - 0.22, y: -Wd / 2 - 0.45, w: 0.44, h: 0.45, fill: '#F4F1EA', rx: 0.05 }, { x: x - 0.22, y: Wd / 2, w: 0.44, h: 0.45, fill: '#F4F1EA', rx: 0.05 }); });
+      }
+      parts.push({ x: g.minX - 0.15, y: Wd / 2 + 0.55, w: 0.3, h: 0.3, fill: '#C8402F', rx: 0.02 });
+      const hx0 = Math.min(g.minX, -g.half) - 1.0, hx1 = Math.max(g.maxX, g.half) + 1.0;
+      mkItem(f.id, f, parts, { x: hx0, y: -Wd / 2 - 1.1, w: hx1 - hx0, h: Wd + 2.2 }, g.half, String(i + 1), '#12241A');
+    });
+    const lineParts = [{ x: -0.07, y: -2.4, w: 0.14, h: 4.8, fill: '#F4F1EA', rx: 0 }, { x: -0.25, y: -2.65, w: 0.5, h: 0.5, fill: '#F4F1EA', rx: 0.25 }, { x: -0.25, y: 2.15, w: 0.5, h: 0.5, fill: '#C8402F', rx: 0.25 }];
+    mkItem('start', c.start, lineParts, { x: -1.6, y: -3.3, w: 3.2, h: 6.6 }, 0.2, 'S', '#2E7D4F');
+    mkItem('finish', c.finish, lineParts, { x: -1.6, y: -3.3, w: 3.2, h: 6.6 }, 0.2, 'F', '#C8402F');
+    Object.assign(v, { items: items, labels: labels, handles: handles });
+    v.courseLen = Math.round(P.length); v.ta = P.ta; v.fenceCount = c.fences.length;
+    const fIdx = c.fences.findIndex(f => f.id === sel), sf = fIdx >= 0 ? c.fences[fIdx] : null;
+    const marker = sel === 'start' ? c.start : sel === 'finish' ? c.finish : null;
+    v.hasFence = !!sf; v.hasMarker = !!marker; v.noSel = !sf && !marker;
+    const cur = sf || marker;
+    v.selRot = cur ? cur.rot : 0; v.selRotVal = v.selRot;
+    v.setRot = e => this.patchSel({ rot: +e.target.value });
+    v.rotLeft = () => this.rotBy(-15); v.rotRight = () => this.rotBy(15); v.flip = () => this.rotBy(180);
+    v.markerName = sel === 'finish' ? 'Finish' : 'Start';
+    if (sf) {
+      Object.assign(v, {
+        selNum: fIdx + 1, selType: K.types[sf.type].label,
+        selH: sf.h.toFixed(2) + ' m', selHVal: sf.h, setH: e => this.patchSel({ h: +e.target.value }),
+        selWidth: sf.width.toFixed(1) + ' m', selWidthVal: sf.width, setWidth: e => this.patchSel({ width: +e.target.value }),
+        hasSpread: sf.type === 'oxer' || sf.type === 'triple', selSpread: (sf.spread || 0).toFixed(1) + ' m', selSpreadVal: sf.spread || 0, setSpread: e => this.patchSel({ spread: +e.target.value }),
+        swatches: Object.keys(K.colors).map(k => ({ label: K.colors[k].label, bg: K.colors[k].main, ring: sf.color === k ? '0 0 0 3px #E8B54A' : 'none', pick: () => this.patchSel({ color: k }) })),
+        selGap: this.gapText(P.gaps[fIdx]),
+        moveEarlier: () => { if (fIdx > 0) this.updateCourse(cc => { const t = cc.fences[fIdx]; cc.fences[fIdx] = cc.fences[fIdx - 1]; cc.fences[fIdx - 1] = t; }); },
+        moveLater: () => { if (fIdx < c.fences.length - 1) this.updateCourse(cc => { const t = cc.fences[fIdx]; cc.fences[fIdx] = cc.fences[fIdx + 1]; cc.fences[fIdx + 1] = t; }); },
+        duplicate: () => { if (c.fences.length >= 24) return; const nf = Object.assign({}, sf, { id: this.uid(), x: Math.min(W, sf.x + 6), y: Math.min(L, sf.y + 3) }); this.updateCourse(cc => { cc.fences.splice(fIdx + 1, 0, nf); }); this.setState({ sel: nf.id }); },
+        remove: () => { this.updateCourse(cc => { cc.fences.splice(fIdx, 1); }); this.setState({ sel: null }); }
+      });
+    }
+    v.noFences = c.fences.length === 0;
+    v.planRows = c.fences.map((f, i) => ({ n: i + 1, type: K.types[f.type].label, h: f.h.toFixed(2) + ' m', gap: P.gaps[i] ? '→ ' + this.gapText(P.gaps[i]) : 'last', pick: () => this.setState({ sel: f.id }) }));
+    v.rounds = (st.rounds || []).map(rd => ({ name: rd.name, line: rd.line }));
+    v.hasRounds = v.rounds.length > 0;
+    return v;
+  }
+  onKey(e, down) {
+    const k = e.key;
+    if (k === ' ' || k === 'Enter') { if (down && !e.repeat && !this.state.result) { e.preventDefault(); this.doJump(); } }
+    else if (k === 'ArrowUp' || k === 'w' || k === 'W') { e.preventDefault(); this.accel = down ? 1 : 0; }
+    else if (k === 'ArrowDown' || k === 's' || k === 'S') { e.preventDefault(); this.accel = down ? -1 : 0; }
+    else if (k === 'Escape' && down) this.exitRide();
+  }
+}
+
+htmPreact.render(htmPreact.h(Component, {}), document.getElementById('app'));
+</script>
+</body>
+</html>
